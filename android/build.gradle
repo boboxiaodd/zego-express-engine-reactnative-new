@@ -39,6 +39,7 @@ buildscript {
             google()
         }
         dependencies {
+            //noinspection GradlePluginVersion
             classpath 'com.android.tools.build:gradle:3.4.1'
         }
     }
@@ -83,6 +84,10 @@ repositories {
 rootProject.allprojects {
     repositories {
         maven { url 'https://storage.zego.im/maven' }
+        maven {
+            url 'http://maven.faceunity.com/repository/maven-public/'
+            allowInsecureProtocol = true
+        }
         google()
     }
 }
@@ -91,4 +96,6 @@ dependencies {
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-native:+'  // From node_modules
     implementation 'im.zego:express-video:3.22.0'
+    implementation 'com.faceunity:core_face_beauty_sticker:8.15.0'
+    implementation 'com.faceunity:model_face_beauty_sticker:8.15.0'
 }
