@@ -25,6 +25,12 @@ export declare class ZegoExpressEngineImpl {
   static setEngineConfig(config: zego.ZegoEngineConfig): Promise<void>
   static setRoomMode(mode: zego.ZegoRoomMode): Promise<void>
   static getVersion(): Promise<string>
+
+	static getAuthInfo(appSign: string): Promise<string>;
+	static setFilter(filterName: string): void;
+	static setFilterLevel(filterLevel: number): void;
+	static setBeauty(name:string, value: number): void;
+
   getVersion(): Promise<string>
   uploadLog(): Promise<void>
   callExperimentalAPI(params: string): Promise<string>
