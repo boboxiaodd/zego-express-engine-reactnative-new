@@ -78,6 +78,9 @@ repositories {
         // Android JSC is installed from npm
         url "$rootDir/../node_modules/jsc-android/dist"
     }
+    flatDir {
+        dirs 'libs'
+    }
     google()
 }
 
@@ -98,4 +101,24 @@ dependencies {
     implementation 'im.zego:express-video:3.22.0'
     implementation 'com.faceunity:core_face_beauty_sticker:8.15.0'
     implementation 'com.faceunity:model_face_beauty_sticker:8.15.0'
+
+    //友盟相关
+    implementation  'com.umeng.umsdk:common:9.9.1'// 友盟(必选)
+    implementation  'com.umeng.umsdk:asms:1.8.7.2'// 必选
+    //noinspection Aligned16KB
+    implementation 'com.umeng.umsdk:apm:2.0.8'// U-APM产品包依赖(必选)
+
+
+    //Photo Picker
+    implementation 'io.github.lucksiege:pictureselector:v3.11.2'
+    implementation 'io.github.lucksiege:ucrop:v3.11.2'
+    implementation 'io.github.lucksiege:camerax:v3.11.2'
+    implementation "com.github.bumptech.glide:glide:5.0.7"
+    annotationProcessor 'com.github.bumptech.glide:compiler:5.0.7'
+
+    //网易风控引擎
+    implementation files('libs/HTProtectLib-5.5.5.aar')
+
+    implementation 'com.github.kongxiaojun:EasyFloat:3.0.1' //悬浮窗插件
+    implementation 'com.github.rlgo:ShortcutBadgerX:1.2.1' //角标插件
 }

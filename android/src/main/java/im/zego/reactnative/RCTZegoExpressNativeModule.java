@@ -1,14 +1,30 @@
 package im.zego.reactnative;
 
+import android.app.Activity;
 import android.app.Application;
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.MotionEvent;
 import android.view.View;
 import android.util.Log;
 import android.view.TextureView;
+import android.view.WindowManager;
+import android.widget.ImageView;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -17,6 +33,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.UIManager;
+import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
@@ -37,11 +54,44 @@ import com.faceunity.core.faceunity.FURenderKit;
 import com.faceunity.core.faceunity.FURenderManager;
 import com.faceunity.core.model.facebeauty.FaceBeauty;
 import com.faceunity.core.utils.FULogger;
+import com.luck.lib.camerax.CameraImageEngine;
+import com.luck.lib.camerax.SimpleCameraX;
+import com.luck.picture.lib.basic.PictureSelectionModel;
+import com.luck.picture.lib.basic.PictureSelector;
+import com.luck.picture.lib.config.SelectMimeType;
+import com.luck.picture.lib.engine.CropFileEngine;
+import com.luck.picture.lib.engine.UriToFileTransformEngine;
+import com.luck.picture.lib.entity.LocalMedia;
+import com.luck.picture.lib.interfaces.OnCameraInterceptListener;
+import com.luck.picture.lib.interfaces.OnKeyValueResultCallbackListener;
+import com.luck.picture.lib.interfaces.OnResultCallbackListener;
+import com.luck.picture.lib.interfaces.OnVideoThumbnailEventListener;
+import com.luck.picture.lib.utils.PictureFileUtils;
+import com.luck.picture.lib.utils.SandboxTransformUtils;
+import com.lzf.easyfloat.EasyFloat;
+import com.lzf.easyfloat.enums.ShowPattern;
+import com.lzf.easyfloat.interfaces.OnFloatCallbacks;
+import com.lzf.easyfloat.interfaces.OnPermissionResult;
+import com.lzf.easyfloat.permission.PermissionUtils;
+import com.netease.htprotect.HTProtect;
+import com.netease.htprotect.HTProtectConfig;
+import com.netease.htprotect.callback.HTPCallback;
+import com.netease.htprotect.result.AntiCheatResult;
+import com.umeng.commonsdk.UMConfigure;
+import com.umeng.commonsdk.listener.OnGetOaidListener;
+import com.umeng.umcrash.IUMCrashCallbackWithType;
+import com.umeng.umcrash.UMCrash;
+import com.umeng.umcrash.UMCrashCallback;
+import com.yalantis.ucrop.UCrop;
+import com.yalantis.ucrop.UCropImageEngine;
 
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,6 +102,9 @@ import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.camera.camera2.Camera2Config;
+import androidx.camera.core.CameraXConfig;
+import androidx.fragment.app.Fragment;
 
 import im.zego.zegoexpress.*;
 import im.zego.zegoexpress.callback.IZegoApiCalledEventHandler;
@@ -197,8 +250,10 @@ import im.zego.zegoexpress.entity.ZegoVideoConfig;
 import im.zego.zegoexpress.entity.ZegoVoiceChangerParam;
 import im.zego.zegoexpress.entity.ZegoNetWorkResourceCache;
 import im.zego.zegoexpress.entity.ZegoCustomAudioProcessConfig;
+import me.leolin.shortcutbadger.ShortcutBadger;
 
-public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule {
+
+public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  implements CameraXConfig.Provider {
 
     private static final String Prefix = "im.zego.reactnative.";
 
@@ -348,6 +403,403 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void getVersion(Promise promise) {
         promise.resolve(ZegoExpressEngine.getVersion());
+    }
+
+
+    @ReactMethod
+    public void initUmeng(ReadableMap options) {
+        Context appContext = reactContext.getApplicationContext();
+        String channel_name = (String) BuildConfigReader.getBuildConfigValue(appContext, "CHANNEL");
+
+        UMConfigure.preInit(getReactApplicationContext(),options.getString("key"), channel_name);
+    }
+
+    @ReactMethod
+    public void setUserId(ReadableMap options) {
+        String userId =  options.getString("uid");
+        UMCrash.registerUMCrashCallback(new IUMCrashCallbackWithType() {
+            @Override
+            public String onCallback(CrashType crashType) {
+                return userId;
+            }
+        });
+    }
+
+    @ReactMethod
+    public void getOAID(Promise promise){
+        UMConfigure.getOaid(getReactApplicationContext(), new OnGetOaidListener() {
+            @Override
+            public void onGetOaid(String s) {
+                promise.resolve(s);
+            }
+        });
+    }
+
+    @ReactMethod
+    public void agreeUmeng(ReadableMap options , Callback callback) {
+        Context appContext = reactContext.getApplicationContext();
+        String channel_name = (String) BuildConfigReader.getBuildConfigValue(appContext, "CHANNEL");
+        String quickpass_id = (String) BuildConfigReader.getBuildConfigValue(appContext, "QUICKPASSID");
+        if(!UMConfigure.isInit) {
+            UMConfigure.init(getReactApplicationContext(), options.getString("key"), channel_name, UMConfigure.DEVICE_TYPE_PHONE, "");
+
+            String productNum = options.getString("productNum");
+            HTProtectConfig config = new HTProtectConfig();
+            config.setChannel(channel_name);
+            HTProtect.init(getReactApplicationContext(), productNum, new HTPCallback() {
+                @Override
+                public void onReceive(int i, String s) {
+                    WritableMap writableMap = Arguments.createMap();
+                    writableMap.putString("channel_name",channel_name);
+                    writableMap.putString("quickpass_id",quickpass_id);
+                    writableMap.putString("HTProtectInit",s);
+                    callback.invoke(writableMap);
+                }
+            },config);
+        }else{
+            WritableMap writableMap = Arguments.createMap();
+            writableMap.putString("channel_name",channel_name);
+            writableMap.putString("quickpass_id",quickpass_id);
+            callback.invoke(writableMap);
+        }
+
+    }
+
+    @ReactMethod
+    public void getNetMobsecToken(Callback callback){
+        Thread tokenThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                AntiCheatResult acResult = HTProtect.getToken(3000, "易盾提供的业务id");
+                Log.i("HTProtect",acResult.toString());
+                WritableMap writableMap = Arguments.createMap();
+                writableMap.putInt("code",acResult.code);
+                writableMap.putString("message",acResult.codeStr);
+                if (acResult.code == AntiCheatResult.OK) {
+                    writableMap.putString("token",acResult.token);
+                }else{
+                    writableMap.putString("token","");
+                }
+                callback.invoke(writableMap);
+            }
+        });
+        tokenThread.start();
+    }
+
+
+    @ReactMethod
+    public void openPicker(ReadableMap options, Callback callback) {
+        final Activity activity = reactContext.getCurrentActivity();
+        PictureSelectionModel picker = PictureSelector.create(activity)
+                .openGallery(options.getInt("picker_type") == 1 ? SelectMimeType.ofImage() : SelectMimeType.ofVideo())
+                .setCameraInterceptListener(new OnCameraInterceptListener() {
+                    @Override
+                    public void openCamera(Fragment fragment, int cameraMode, int requestCode) {
+                        // 注意* 如果你实现自己的拍照库，需要在Activity的.setResult(); 给Intent MediaStore.EXTRA_OUTPUT 保存拍照后的路径；
+
+                        SimpleCameraX camera = SimpleCameraX.of();
+                        camera.setCameraMode(cameraMode);
+                        camera.setImageEngine(new CameraImageEngine() {
+                            @Override
+                            public void loadImage(Context context, String url, ImageView imageView) {
+                                Glide.with(context).load(url).into(imageView);
+                            }
+                        });
+                        camera.start(fragment.getActivity(), fragment, requestCode);
+                    }
+                });
+        picker.setImageEngine(GlideEngine.createGlideEngine());
+        picker.setMaxSelectNum(options.getInt("max"));
+        if(options.hasKey("maxFileSize")) {
+            picker.setFilterMaxFileSize(options.getInt("maxFileSize"));
+        }
+        boolean isAvatar = options.getBoolean("is_avatar");
+        if(isAvatar){
+            picker.setCropEngine(new CropFileEngine() {
+                @Override
+                public void onStartCrop(Fragment fragment, Uri srcUri, Uri destinationUri, ArrayList<String> dataSource, int requestCode) {
+                    UCrop uCrop = UCrop.of(srcUri, destinationUri, dataSource);
+                    uCrop.setImageEngine(new UCropImageEngine() {
+                        @Override
+                        public void loadImage(Context context, String url, ImageView imageView) {
+                            Glide.with(context).load(url).into(imageView);
+                        }
+
+                        @Override
+                        public void loadImage(Context context, Uri url, int maxWidth, int maxHeight, OnCallbackListener<Bitmap> call) {
+
+                        }
+                    });
+                    UCrop.Options ucropOptions = new UCrop.Options();
+                    ucropOptions.setToolbarColor(Color.rgb(0,0,0));
+                    ucropOptions.setStatusBarColor(Color.rgb(0,0,0));
+                    ucropOptions.isDarkStatusBarBlack(false);
+                    ucropOptions.setToolbarWidgetColor(Color.rgb(255,255,255));
+                    uCrop.withOptions(ucropOptions);
+                    uCrop.withAspectRatio(1,1);
+                    uCrop.start(fragment.requireActivity(), fragment, requestCode);
+                }
+            });
+        }
+        if(options.getInt("picker_type") == 2){
+            picker.setVideoThumbnailListener(new MeOnVideoThumbnailEventListener(getVideoThumbnailDir()));
+        }
+        picker.setSandboxFileEngine(new UriToFileTransformEngine() {
+            @Override
+            public void onUriToFileAsyncTransform(Context context, String srcPath, String mineType, OnKeyValueResultCallbackListener call) {
+                if (call != null) {
+                    String sandboxPath = SandboxTransformUtils.copyPathToSandbox(context, srcPath, mineType);
+                    call.onCallback(srcPath,sandboxPath);
+                }
+            }
+        });
+        picker.forResult(new OnResultCallbackListener<LocalMedia>() {
+            @Override
+            public void onResult(ArrayList<LocalMedia> result) {
+                WritableArray writableArray = Arguments.createArray();
+                int length = result.size();
+                for(int i = 0; i < length ; i++){
+                    WritableMap writableMap = Arguments.createMap();
+                    LocalMedia item  = result.get(i);
+                    if(options.getBoolean("is_avatar")){
+                        writableMap.putString("path",item.getCutPath());
+                    }else{
+                        writableMap.putString("path",item.getAvailablePath());
+                    }
+                    writableMap.putDouble("size",item.getSize());
+                    writableMap.putInt("width",item.getWidth());
+                    writableMap.putInt("height",item.getHeight());
+                    if(options.getInt("picker_type") == 2){
+                        writableMap.putString("cover",item.getVideoThumbnailPath());
+                        writableMap.putDouble("duration", item.getDuration());
+                    }
+                    writableArray.pushMap(writableMap);
+                }
+                callback.invoke(writableArray);
+            }
+
+            @Override
+            public void onCancel() {
+                callback.invoke("cancel");
+            }
+        });
+    }
+
+    private String getVideoThumbnailDir() {
+        File externalFilesDir = this.getReactApplicationContext().getExternalFilesDir("");
+        File customFile = new File(externalFilesDir.getAbsolutePath(), "Thumbnail");
+        if (!customFile.exists()) {
+            customFile.mkdirs();
+        }
+        return customFile.getAbsolutePath() + File.separator;
+    }
+
+    @NonNull
+    @Override
+    public CameraXConfig getCameraXConfig() {
+        return CameraXConfig.Builder.fromConfig(Camera2Config.defaultConfig())
+                .setMinimumLoggingLevel(Log.ERROR).build();
+    }
+
+    private static class MeOnVideoThumbnailEventListener implements OnVideoThumbnailEventListener {
+        private final String targetPath;
+
+        public MeOnVideoThumbnailEventListener(String targetPath) {
+            this.targetPath = targetPath;
+        }
+
+        @Override
+        public void onVideoThumbnail(Context context, String videoPath, OnKeyValueResultCallbackListener call) {
+            Glide.with(context).asBitmap().sizeMultiplier(0.6F).load(videoPath).into(new CustomTarget<Bitmap>() {
+                @Override
+                public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    resource.compress(Bitmap.CompressFormat.JPEG, 60, stream);
+                    FileOutputStream fos = null;
+                    String result = null;
+                    try {
+                        File targetFile = new File(targetPath, "thumbnails_" + System.currentTimeMillis() + ".jpg");
+                        fos = new FileOutputStream(targetFile);
+                        fos.write(stream.toByteArray());
+                        fos.flush();
+                        result = targetFile.getAbsolutePath();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        PictureFileUtils.close(fos);
+                        PictureFileUtils.close(stream);
+                    }
+                    if (call != null) {
+                        call.onCallback(videoPath, result);
+                    }
+                }
+
+                @Override
+                public void onLoadCleared(@Nullable Drawable placeholder) {
+                    if (call != null) {
+                        call.onCallback(videoPath, "");
+                    }
+                }
+            });
+        }
+    }
+
+
+    /* 悬浮窗相关 */
+
+    @ReactMethod
+    public void checkFloatWindowPermission(Promise promise){
+        Boolean hasPermission =  PermissionUtils.checkPermission(reactContext);
+        promise.resolve(hasPermission);
+    }
+
+    @ReactMethod
+    public void requestFloatWindowPermission(Promise promise){
+        if(reactContext.getCurrentActivity() != null) {
+            PermissionUtils.requestPermission(reactContext.getCurrentActivity(), new OnPermissionResult() {
+                @Override
+                public void permissionResult(boolean b) {
+                    promise.resolve(b);
+                }
+            });
+        }else{
+            promise.resolve(false);
+        }
+    }
+
+    @ReactMethod
+    public void createFloatWindow(Promise promise){
+        final Activity currentActivity = reactContext.getCurrentActivity();
+        if (currentActivity != null) {
+            currentActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    EasyFloat.with(reactContext)
+                            .setLayout(R.layout.float_view)
+                            .setShowPattern(ShowPattern.BACKGROUND)
+                            .registerCallbacks(new OnFloatCallbacks() {
+                                @Override
+                                public void createdResult(boolean b, @Nullable String s, @Nullable View view) {
+                                    promise.resolve(b);
+                                }
+
+                                @Override
+                                public void show(@NonNull View view) {
+
+                                }
+
+                                @Override
+                                public void hide(@NonNull View view) {
+
+                                }
+
+                                @Override
+                                public void dismiss() {
+
+                                }
+
+                                @Override
+                                public void touchEvent(@NonNull View view, @NonNull MotionEvent motionEvent) {
+
+                                }
+
+                                @Override
+                                public void drag(@NonNull View view, @NonNull MotionEvent motionEvent) {
+
+                                }
+
+                                @Override
+                                public void dragEnd(@NonNull View view) {
+
+                                }
+                            })
+                            .show();
+                }
+            });
+        }
+    }
+
+    @ReactMethod
+    public void closeFloatWindow(){
+        try{
+            EasyFloat.dismiss();
+        }catch (Exception ignored){}
+
+    }
+
+    @ReactMethod
+    public void activeApp(Promise promise) {
+        // 确保在主线程执行
+        UiThreadUtil.runOnUiThread(() -> {
+            try {
+                // 1. 获取应用包名
+                String packageName = reactContext.getPackageName();
+                // 2. 获取启动主Activity的Intent
+                Intent launchIntent = reactContext.getPackageManager()
+                        .getLaunchIntentForPackage(packageName);
+
+                if (launchIntent != null) {
+                    // 3. 清理Intent，只保留启动目标，移除其他可能的数据
+                    launchIntent.setData(null);
+                    // 4. 添加必要的flags
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    // 5. 启动Activity
+                    reactContext.startActivity(launchIntent);
+                    promise.resolve("open");
+                } else {
+                    promise.reject("NO_LAUNCH_INTENT", "无法获取应用的启动Intent。");
+                }
+            } catch (Exception e) {
+                promise.reject("ERROR", e.getMessage());
+            }
+        });
+    }
+
+
+
+    @ReactMethod
+    public void playNewMessageSound(){
+        try {
+            MediaPlayer mp = MediaPlayer.create(reactContext,R.raw.new_msg);
+            mp.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @ReactMethod
+    public void setBadge(ReadableMap options){
+        ShortcutBadger.applyCount(getReactApplicationContext(), options.getInt("badge"));
+    }
+
+
+    private Handler mHandlerBlockScreenShot = null;
+
+    @ReactMethod
+    public void disableScreenShot(){
+        Activity activity = reactContext.getCurrentActivity();
+        if(activity != null){
+            if(mHandlerBlockScreenShot == null){
+                mHandlerBlockScreenShot = new Handler(Looper.getMainLooper());
+            }
+            mHandlerBlockScreenShot.post(() ->
+                    activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+            );
+        }
+    }
+
+    @ReactMethod
+    public void enableScreenShot() {
+        Activity activity = reactContext.getCurrentActivity();
+        if(activity != null){
+            if(mHandlerBlockScreenShot == null){
+                mHandlerBlockScreenShot = new Handler(Looper.getMainLooper());
+            }
+            mHandlerBlockScreenShot.post(() ->
+                    activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            );
+        }
     }
 
 
