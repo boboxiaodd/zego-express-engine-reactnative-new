@@ -273,7 +273,6 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
 
     private boolean destroyWhenKilled = false;
 
-    private KAlertDialog pDialog = null;
 
     public RCTZegoExpressNativeModule(ReactApplicationContext reactContext) {
         super(reactContext);
