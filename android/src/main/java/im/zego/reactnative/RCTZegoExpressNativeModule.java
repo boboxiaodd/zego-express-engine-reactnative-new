@@ -426,9 +426,9 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         });
     }
 
-    @ReactMethod(isBlockingSynchronousMethod = true)
-    public String getUserAgent() {
-        return WebSettings.getDefaultUserAgent(reactContext);
+    @ReactMethod()
+    public void getUserAgent(Promise promise) {
+        promise.resolve(WebSettings.getDefaultUserAgent(reactContext));
     }
     
     @ReactMethod
