@@ -121,4 +121,8 @@ dependencies {
 
     implementation 'com.github.kongxiaojun:EasyFloat:3.0.1' //悬浮窗插件
     implementation 'com.github.rlgo:ShortcutBadgerX:1.2.1' //角标插件
+
+        //dialog
+    implementation 'io.github.tutorialsandroid:kalertdialog:21.1.0'
+    implementation 'io.github.tutorialsandroid:progressx:7.0.5'
 }
