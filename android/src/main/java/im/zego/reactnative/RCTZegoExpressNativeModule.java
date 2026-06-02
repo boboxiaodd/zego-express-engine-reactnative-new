@@ -19,6 +19,7 @@ import android.util.Log;
 import android.view.TextureView;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.webkit.WebSettings;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
