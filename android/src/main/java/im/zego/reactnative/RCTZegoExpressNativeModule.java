@@ -425,6 +425,11 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         });
     }
 
+    @ReactMethod(isBlockingSynchronousMethod = true)
+    public String getUserAgent() {
+        return WebSettings.getDefaultUserAgent(reactContext);
+    }
+    
     @ReactMethod
     public void getOAID(Promise promise){
         UMConfigure.getOaid(getReactApplicationContext(), new OnGetOaidListener() {
