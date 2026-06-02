@@ -24,7 +24,6 @@ import android.webkit.WebSettings;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
-import com.developer.kalert.KAlertDialog;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -442,28 +441,6 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
             public void onGetOaid(String s) {
                 promise.resolve(s);
             }
-        });
-    }
-
-    private Handler loaddingHeader  = null;
-    @ReactMethod
-    public void showLoadding(ReadableMap options) {
-        if(loaddingHeader == null){
-            loaddingHeader = new Handler(Looper.getMainLooper());
-        }
-        loaddingHeader.post(() -> {
-            pDialog = new KAlertDialog(reactContext, KAlertDialog.PROGRESS_TYPE, true);
-            pDialog.getProgressHelper().setBarColor(Color.parseColor(options.getString("color")));
-            pDialog.setTitleText(options.getString("title"));
-            pDialog.setCancelable(false);
-            pDialog.show();
-        });
-    }
-
-    @ReactMethod
-    public void hideLoadding() {
-        loaddingHeader.post(() -> {
-            this.pDialog.hide();
         });
     }
 
