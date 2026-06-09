@@ -57,10 +57,6 @@ import com.faceunity.core.faceunity.FURenderKit;
 import com.faceunity.core.faceunity.FURenderManager;
 import com.faceunity.core.model.facebeauty.FaceBeauty;
 import com.faceunity.core.utils.FULogger;
-import com.flyjingfish.openimagelib.OpenImage;
-import com.flyjingfish.openimagelib.beans.OpenImageUrl;
-import com.flyjingfish.openimagelib.enums.MediaType;
-import com.flyjingfish.openimagelib.listener.SourceImageViewIdGet;
 import com.luck.lib.camerax.CameraImageEngine;
 import com.luck.lib.camerax.SimpleCameraX;
 import com.luck.picture.lib.basic.PictureSelectionModel;
@@ -501,36 +497,7 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         tokenThread.start();
     }
 
-    private List<String> readableArrayToList(ReadableArray readableArray) {
-        if (readableArray == null) return new ArrayList<>();
-        List<String> list = new ArrayList<>(readableArray.size());
-        for (int i = 0; i < readableArray.size(); i++) {
-            // 根据实际存储的类型选择 getString / getInt / getDouble / getBoolean 等
-            list.add(readableArray.getString(i));
-        }
-        return list;
-    }
 
-    @ReactMethod
-    public void openPhotoBrowser(ReadableArray photoList, int reactTag) {
-        //在点击时调用（以下以RecyclerView为例介绍）
-        final Activity activity = reactContext.getCurrentActivity();
-        if(activity != null){
-            View view = activity.findViewById(reactTag);
-            if (!(view instanceof ImageView imageView)) return;
-
-            OpenImage.with(activity)
-                    //点击的ImageView的ScaleType类型（如果设置不对，打开的动画效果将是错误的）
-//                    .setSrcImageViewScaleType(ImageView.ScaleType.CENTER_CROP,true)
-                    //RecyclerView的数据
-                    .setClickImageView(imageView)
-                    .setShowSrcImageView(false)
-                    .setImageUrlList(readableArrayToList(photoList), MediaType.IMAGE)
-                    //开始展示大图
-                    .show();
-        }
-
-    }
     @ReactMethod
     public void openPicker(ReadableMap options, Callback callback) {
         final Activity activity = reactContext.getCurrentActivity();
