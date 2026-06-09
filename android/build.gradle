@@ -103,10 +103,13 @@ dependencies {
     implementation 'com.faceunity:model_face_beauty_sticker:8.15.0'
 
     //友盟相关
-    implementation  'com.umeng.umsdk:common:9.9.1'// 友盟(必选)
+    implementation  'com.umeng.umsdk:common:9.9.2'// 友盟(必选)
     implementation  'com.umeng.umsdk:asms:1.8.7.2'// 必选
     //noinspection Aligned16KB
     implementation 'com.umeng.umsdk:apm:2.0.8'// U-APM产品包依赖(必选)
+
+    //图片浏览器
+    implementation 'io.github.flyjingfish:openimage-full:2.5.1'
 
 
     //Photo Picker
