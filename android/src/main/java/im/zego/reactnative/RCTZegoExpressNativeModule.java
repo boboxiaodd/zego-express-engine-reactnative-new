@@ -446,11 +446,24 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         });
     }
 
+    private String getAppStringResource(String resName) {
+        try {
+            Context context = getReactApplicationContext();
+            // 动态获取资源 ID
+            int resId = context.getResources().getIdentifier(resName, "string", context.getPackageName());
+            if (resId != 0) {
+                return context.getString(resId);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
     @ReactMethod
     public void agreeUmeng(ReadableMap options , Callback callback) {
-        Context appContext = reactContext.getApplicationContext();
-        String channel_name = (String) BuildConfigReader.getBuildConfigValue(appContext, "CHANNEL");
-        String quickpass_id = (String) BuildConfigReader.getBuildConfigValue(appContext, "QUICKPASSID");
+        String channel_name = getAppStringResource("CHANNEL");  //(String) BuildConfigReader.getBuildConfigValue(appContext, "CHANNEL");
+        String quickpass_id = getAppStringResource("QUICKPASSID"); //(String) BuildConfigReader.getBuildConfigValue(appContext, "QUICKPASSID");
         if(!UMConfigure.isInit) {
             UMConfigure.init(getReactApplicationContext(), options.getString("key"), channel_name, UMConfigure.DEVICE_TYPE_PHONE, "");
 
