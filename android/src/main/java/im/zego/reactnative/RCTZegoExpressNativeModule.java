@@ -255,7 +255,6 @@ import im.zego.zegoexpress.entity.ZegoVideoConfig;
 import im.zego.zegoexpress.entity.ZegoVoiceChangerParam;
 import im.zego.zegoexpress.entity.ZegoNetWorkResourceCache;
 import im.zego.zegoexpress.entity.ZegoCustomAudioProcessConfig;
-import me.leolin.shortcutbadger.ShortcutBadger;
 
 
 public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  implements CameraXConfig.Provider {
@@ -791,12 +790,6 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
             e.printStackTrace();
         }
     }
-
-    @ReactMethod
-    public void setBadge(ReadableMap options){
-        ShortcutBadger.applyCount(getReactApplicationContext(), options.getInt("badge"));
-    }
-
 
     private Handler mHandlerBlockScreenShot = null;
 
