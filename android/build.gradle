@@ -120,4 +120,5 @@ dependencies {
     implementation files('libs/HTProtectLib-5.5.5.aar')
 
     implementation 'com.github.kongxiaojun:EasyFloat:3.0.1' //悬浮窗插件
+    implementation 'com.github.rlgo:ShortcutBadgerX:1.2.1' //角标插件
 }
