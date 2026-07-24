@@ -294,6 +294,7 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
             @Override
             public void onHostDestroy() {
                 if (destroyWhenKilled) {
+                    releaseFaceUnity();
                     ZegoExpressEngine.destroyEngine(null);
                 }
             }
@@ -827,8 +828,25 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
 
 
     private FaceBeauty beauty;
+    private volatile boolean faceUnityReady = false;
+    private volatile boolean faceUnityRenderErrorLogged = false;
     private final String BUNDLE_FACE_BEAUTIFICATION = "graphics" + File.separator + "face_beautification.bundle";
     private final String BUNDLE_AI_FACE = "model" + File.separator + "ai_face_processor.bundle";
+
+    private void releaseFaceUnityRenderResources() {
+        faceUnityRenderErrorLogged = false;
+        try {
+            // FaceUnity render resources belong to Zego's current custom-processing GL thread.
+            FURenderKit.getInstance().release();
+        } catch (Throwable error) {
+            Log.e(ZegoTag, "Unable to release FaceUnity render resources", error);
+        }
+    }
+
+    private void releaseFaceUnity() {
+        faceUnityReady = false;
+        releaseFaceUnityRenderResources();
+    }
 
     @ReactMethod
     public void initBeauty(ReadableMap config){
@@ -884,6 +902,9 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         beauty.setEyeEnlargingIntensity(config.getDouble("eyeEnlarging"));
         beauty.setMouthIntensity(config.getDouble("intensityMouth"));
         beauty.setDelspotIntensity(config.getDouble("delspotIntensity"));
+        if (faceUnityReady) {
+            FURenderKit.getInstance().setFaceBeauty(beauty);
+        }
     }
     @ReactMethod
     public void setBeautyString(String key,String value) {
@@ -1053,6 +1074,7 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
 
         // Fix hot update did not destroy the engine
         if (ZegoExpressEngine.getEngine() != null) {
+            releaseFaceUnity();
             ZegoExpressEngine.destroyEngine(null);
         }
 
@@ -1076,17 +1098,31 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         FURenderManager.setKitDebug(FULogger.LogLevel.TRACE);
         FURenderManager.setCoreDebug(FULogger.LogLevel.ERROR);
         FURenderKit mFURenderKit = FURenderKit.getInstance();
+        faceUnityReady = false;
+        faceUnityRenderErrorLogged = false;
         FURenderManager.registerFURender(reactContext, authpack.A(), new OperateCallback() {
             @Override
             public void onSuccess(int i, @NotNull String s) {
                 if (i == FURenderConfig.OPERATE_SUCCESS_AUTH) {
-                    mFURenderKit.getFUAIController().loadAIProcessor(BUNDLE_AI_FACE, FUAITypeEnum.FUAITYPE_FACEPROCESSOR);
-                    mFURenderKit.getFUAIController().setMaxFaces(1);
+                    try {
+                        mFURenderKit.getFUAIController().loadAIProcessor(BUNDLE_AI_FACE, FUAITypeEnum.FUAITYPE_FACEPROCESSOR);
+                        mFURenderKit.getFUAIController().setMaxFaces(1);
+                        if (beauty != null) {
+                            mFURenderKit.setFaceBeauty(beauty);
+                        }
+                        faceUnityReady = true;
+                        Log.i(ZegoTag, "FaceUnity initialized");
+                    } catch (Throwable error) {
+                        faceUnityReady = false;
+                        Log.e(ZegoTag, "FaceUnity initialization failed", error);
+                    }
                 }
             }
 
             @Override
             public void onFail(int i, @NotNull String s) {
+                faceUnityReady = false;
+                Log.e(ZegoTag, "FaceUnity registration failed: " + i + ", " + s);
             }
         });
 
@@ -1096,28 +1132,47 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         ZegoExpressEngine.getEngine().setCustomVideoProcessHandler(new IZegoCustomVideoProcessHandler() {
             @Override
             public void onStart(ZegoPublishChannel channel) {
-                FURenderKit.getInstance().setFaceBeauty(beauty);
+                if (faceUnityReady && beauty != null) {
+                    FURenderKit.getInstance().setFaceBeauty(beauty);
+                }
             }
 
             @Override
             public void onStop(ZegoPublishChannel channel) {
-                FURenderKit.getInstance().release();
+                // Zego creates a new custom-processing GL session after preview restarts.
+                // Release the old session so FaceUnity binds its resources to the new GL thread.
+                releaseFaceUnityRenderResources();
             }
 
             @Override
             public void onCapturedUnprocessedTextureData(int textureID, int width, int height, long referenceTimeMillisecond, ZegoPublishChannel channel) {
                 super.onCapturedUnprocessedTextureData(textureID, width, height, referenceTimeMillisecond, channel);
-
-                FURenderInputData input = new FURenderInputData(width,height);
-                FURenderInputData.FURenderConfig config  = input.getRenderConfig();
-                config.setOutputMatrix(FUTransformMatrixEnum.CCROT180);
-                input.setRenderConfig(config);
-                FURenderInputData.FUTexture texture =  new FURenderInputData.FUTexture(FUInputTextureEnum.FU_ADM_FLAG_COMMON_TEXTURE,textureID);
-                input.setTexture(texture);
-                FURenderOutputData out = FURenderKit.getInstance().renderWithInput(input);
-                if(out.getTexture() != null) textureID = out.getTexture().getTexId();
-
-                ZegoExpressEngine.getEngine().sendCustomVideoProcessedTextureData(textureID, width, height, referenceTimeMillisecond, channel);
+                int outputTextureID = textureID;
+                try {
+                    if (faceUnityReady) {
+                        FURenderInputData input = new FURenderInputData(width,height);
+                        FURenderInputData.FURenderConfig config  = input.getRenderConfig();
+                        config.setOutputMatrix(FUTransformMatrixEnum.CCROT180);
+                        input.setRenderConfig(config);
+                        FURenderInputData.FUTexture texture =  new FURenderInputData.FUTexture(FUInputTextureEnum.FU_ADM_FLAG_COMMON_TEXTURE,textureID);
+                        input.setTexture(texture);
+                        FURenderOutputData out = FURenderKit.getInstance().renderWithInput(input);
+                        if(out != null && out.getTexture() != null) {
+                            outputTextureID = out.getTexture().getTexId();
+                        }
+                        faceUnityRenderErrorLogged = false;
+                    }
+                } catch (Throwable error) {
+                    if (!faceUnityRenderErrorLogged) {
+                        faceUnityRenderErrorLogged = true;
+                        Log.e(ZegoTag, "FaceUnity render failed, using original texture", error);
+                    }
+                } finally {
+                    ZegoExpressEngine engine = ZegoExpressEngine.getEngine();
+                    if (engine != null) {
+                        engine.sendCustomVideoProcessedTextureData(outputTextureID, width, height, referenceTimeMillisecond, channel);
+                    }
+                }
             }
         });
 
@@ -1153,11 +1208,13 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
             ZegoExpressEngine.destroyEngine(new IZegoDestroyCompletionCallback() {
                 @Override
                 public void onDestroyCompletion() {
+                    releaseFaceUnity();
                     promise.resolve(null);
                 }
             });
             kIsInited = false;
         } else {
+            releaseFaceUnity();
             promise.resolve(null);
         }
     }
@@ -1356,29 +1413,66 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
         if (view != null) {
             final int viewTag = view.getInt("reactTag");
             if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
-                UIManager uiManager = UIManagerHelper.getUIManager(reactContext, UIManagerType.FABRIC);
-                View nativeView = uiManager.resolveView(viewTag);
-                ZegoCanvas canvas = createCanvas(nativeView, view);
-                if (ZegoExpressEngine.getEngine() != null) {
-                    ZegoExpressEngine.getEngine().startPreview(canvas, ZegoPublishChannel.getZegoPublishChannel(channel));
-                }
-                promise.resolve(null);
+                UiThreadUtil.runOnUiThread(() -> {
+                    try {
+                        UIManager uiManager = UIManagerHelper.getUIManager(reactContext, UIManagerType.FABRIC);
+                        if (uiManager == null) {
+                            promise.reject("E_PREVIEW_UI_MANAGER", "Fabric UIManager is unavailable");
+                            return;
+                        }
+                        View nativeView = uiManager.resolveView(viewTag);
+                        ZegoCanvas canvas = createCanvas(nativeView, view);
+                        ZegoExpressEngine engine = ZegoExpressEngine.getEngine();
+                        if (canvas == null) {
+                            promise.reject("E_PREVIEW_VIEW", "Preview view is unavailable or has an invalid type");
+                            return;
+                        }
+                        if (engine == null) {
+                            promise.reject("E_PREVIEW_ENGINE", "Zego engine is unavailable");
+                            return;
+                        }
+                        engine.startPreview(canvas, ZegoPublishChannel.getZegoPublishChannel(channel));
+                        promise.resolve(null);
+                    } catch (Throwable error) {
+                        promise.reject("E_START_PREVIEW", "Unable to bind the preview view", error);
+                    }
+                });
             } else {
                 UIManagerModule uiMgr = this.reactContext.getNativeModule(UIManagerModule.class);
+                if (uiMgr == null) {
+                    promise.reject("E_PREVIEW_UI_MANAGER", "UIManager is unavailable");
+                    return;
+                }
                 uiMgr.addUIBlock(new UIBlock() {
                     @Override
                     public void execute(NativeViewHierarchyManager nativeViewHierarchyManager) {
-                        View nativeView = nativeViewHierarchyManager.resolveView(viewTag);
-                        ZegoCanvas canvas = createCanvas(nativeView, view);
-                        if (ZegoExpressEngine.getEngine() != null) {
-                            ZegoExpressEngine.getEngine().startPreview(canvas, ZegoPublishChannel.getZegoPublishChannel(channel));
+                        try {
+                            View nativeView = nativeViewHierarchyManager.resolveView(viewTag);
+                            ZegoCanvas canvas = createCanvas(nativeView, view);
+                            ZegoExpressEngine engine = ZegoExpressEngine.getEngine();
+                            if (canvas == null) {
+                                promise.reject("E_PREVIEW_VIEW", "Preview view is unavailable or has an invalid type");
+                                return;
+                            }
+                            if (engine == null) {
+                                promise.reject("E_PREVIEW_ENGINE", "Zego engine is unavailable");
+                                return;
+                            }
+                            engine.startPreview(canvas, ZegoPublishChannel.getZegoPublishChannel(channel));
+                            promise.resolve(null);
+                        } catch (Throwable error) {
+                            promise.reject("E_START_PREVIEW", "Unable to bind the preview view", error);
                         }
-                        promise.resolve(null);
                     }
                 });
             }
         } else {
-            ZegoExpressEngine.getEngine().startPreview(null, ZegoPublishChannel.getZegoPublishChannel(channel));
+            ZegoExpressEngine engine = ZegoExpressEngine.getEngine();
+            if (engine == null) {
+                promise.reject("E_PREVIEW_ENGINE", "Zego engine is unavailable");
+                return;
+            }
+            engine.startPreview(null, ZegoPublishChannel.getZegoPublishChannel(channel));
             promise.resolve(null);
         }
     }
