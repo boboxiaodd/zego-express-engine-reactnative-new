@@ -109,13 +109,6 @@ dependencies {
     implementation 'com.umeng.umsdk:apm:2.0.8'// U-APM产品包依赖(必选)
 
 
-    //Photo Picker
-    implementation 'io.github.lucksiege:pictureselector:v3.11.2'
-    implementation 'io.github.lucksiege:ucrop:v3.11.2'
-    implementation 'io.github.lucksiege:camerax:v3.11.2'
-    implementation "com.github.bumptech.glide:glide:5.0.7"
-    annotationProcessor 'com.github.bumptech.glide:compiler:5.0.7'
-
     //网易风控引擎
     implementation files('libs/HTProtectLib-5.5.5.aar')
 
