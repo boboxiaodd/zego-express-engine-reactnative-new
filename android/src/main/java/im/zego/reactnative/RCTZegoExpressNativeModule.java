@@ -1,18 +1,14 @@
 package im.zego.reactnative;
 
-import static java.util.Collections.emptyList;
 
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
-import android.graphics.drawable.Drawable;
-import android.media.MediaPlayer;
-import android.net.Uri;
+
 import android.os.Handler;
 import android.os.Looper;
 import android.view.MotionEvent;
@@ -20,12 +16,8 @@ import android.view.View;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.WindowManager;
-import android.widget.ImageView;
 import android.webkit.WebSettings;
 
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.request.target.CustomTarget;
-import com.bumptech.glide.request.transition.Transition;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
@@ -57,20 +49,7 @@ import com.faceunity.core.faceunity.FURenderKit;
 import com.faceunity.core.faceunity.FURenderManager;
 import com.faceunity.core.model.facebeauty.FaceBeauty;
 import com.faceunity.core.utils.FULogger;
-import com.luck.lib.camerax.CameraImageEngine;
-import com.luck.lib.camerax.SimpleCameraX;
-import com.luck.picture.lib.basic.PictureSelectionModel;
-import com.luck.picture.lib.basic.PictureSelector;
-import com.luck.picture.lib.config.SelectMimeType;
-import com.luck.picture.lib.engine.CropFileEngine;
-import com.luck.picture.lib.engine.UriToFileTransformEngine;
-import com.luck.picture.lib.entity.LocalMedia;
-import com.luck.picture.lib.interfaces.OnCameraInterceptListener;
-import com.luck.picture.lib.interfaces.OnKeyValueResultCallbackListener;
-import com.luck.picture.lib.interfaces.OnResultCallbackListener;
-import com.luck.picture.lib.interfaces.OnVideoThumbnailEventListener;
-import com.luck.picture.lib.utils.PictureFileUtils;
-import com.luck.picture.lib.utils.SandboxTransformUtils;
+
 import com.lzf.easyfloat.EasyFloat;
 import com.lzf.easyfloat.enums.ShowPattern;
 import com.lzf.easyfloat.interfaces.OnFloatCallbacks;
@@ -84,32 +63,19 @@ import com.umeng.commonsdk.UMConfigure;
 import com.umeng.commonsdk.listener.OnGetOaidListener;
 import com.umeng.umcrash.IUMCrashCallbackWithType;
 import com.umeng.umcrash.UMCrash;
-import com.umeng.umcrash.UMCrashCallback;
-import com.yalantis.ucrop.UCrop;
-import com.yalantis.ucrop.UCropImageEngine;
 
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HexFormat;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.camera.camera2.Camera2Config;
-import androidx.camera.core.CameraXConfig;
-import androidx.fragment.app.Fragment;
 
 import im.zego.zegoexpress.*;
 import im.zego.zegoexpress.callback.IZegoApiCalledEventHandler;
@@ -258,7 +224,7 @@ import im.zego.zegoexpress.entity.ZegoCustomAudioProcessConfig;
 
 import me.leolin.shortcutbadger.ShortcutBadger;
 
-public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  implements CameraXConfig.Provider {
+public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule {
 
     private static final String Prefix = "im.zego.reactnative.";
 
@@ -517,164 +483,6 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
     }
 
 
-    @ReactMethod
-    public void openPicker(ReadableMap options, Callback callback) {
-        final Activity activity = reactContext.getCurrentActivity();
-        PictureSelectionModel picker = PictureSelector.create(activity)
-                .openGallery(options.getInt("picker_type") == 1 ? SelectMimeType.ofImage() : SelectMimeType.ofVideo())
-                .setCameraInterceptListener(new OnCameraInterceptListener() {
-                    @Override
-                    public void openCamera(Fragment fragment, int cameraMode, int requestCode) {
-                        // 注意* 如果你实现自己的拍照库，需要在Activity的.setResult(); 给Intent MediaStore.EXTRA_OUTPUT 保存拍照后的路径；
-
-                        SimpleCameraX camera = SimpleCameraX.of();
-                        camera.setCameraMode(cameraMode);
-                        camera.setImageEngine(new CameraImageEngine() {
-                            @Override
-                            public void loadImage(Context context, String url, ImageView imageView) {
-                                Glide.with(context).load(url).into(imageView);
-                            }
-                        });
-                        camera.start(fragment.getActivity(), fragment, requestCode);
-                    }
-                });
-        picker.setImageEngine(GlideEngine.createGlideEngine());
-        picker.setMaxSelectNum(options.getInt("max"));
-        if(options.hasKey("maxFileSize")) {
-            picker.setFilterMaxFileSize(options.getInt("maxFileSize"));
-        }
-        boolean isAvatar = options.getBoolean("is_avatar");
-        if(isAvatar){
-            picker.setCropEngine(new CropFileEngine() {
-                @Override
-                public void onStartCrop(Fragment fragment, Uri srcUri, Uri destinationUri, ArrayList<String> dataSource, int requestCode) {
-                    UCrop uCrop = UCrop.of(srcUri, destinationUri, dataSource);
-                    uCrop.setImageEngine(new UCropImageEngine() {
-                        @Override
-                        public void loadImage(Context context, String url, ImageView imageView) {
-                            Glide.with(context).load(url).into(imageView);
-                        }
-
-                        @Override
-                        public void loadImage(Context context, Uri url, int maxWidth, int maxHeight, OnCallbackListener<Bitmap> call) {
-
-                        }
-                    });
-                    UCrop.Options ucropOptions = new UCrop.Options();
-                    ucropOptions.setToolbarColor(Color.rgb(0,0,0));
-                    ucropOptions.setStatusBarColor(Color.rgb(0,0,0));
-                    ucropOptions.isDarkStatusBarBlack(false);
-                    ucropOptions.setToolbarWidgetColor(Color.rgb(255,255,255));
-                    uCrop.withOptions(ucropOptions);
-                    uCrop.withAspectRatio(1,1);
-                    uCrop.start(fragment.requireActivity(), fragment, requestCode);
-                }
-            });
-        }
-        if(options.getInt("picker_type") == 2){
-            picker.setVideoThumbnailListener(new MeOnVideoThumbnailEventListener(getVideoThumbnailDir()));
-        }
-        picker.setSandboxFileEngine(new UriToFileTransformEngine() {
-            @Override
-            public void onUriToFileAsyncTransform(Context context, String srcPath, String mineType, OnKeyValueResultCallbackListener call) {
-                if (call != null) {
-                    String sandboxPath = SandboxTransformUtils.copyPathToSandbox(context, srcPath, mineType);
-                    call.onCallback(srcPath,sandboxPath);
-                }
-            }
-        });
-        picker.forResult(new OnResultCallbackListener<LocalMedia>() {
-            @Override
-            public void onResult(ArrayList<LocalMedia> result) {
-                WritableArray writableArray = Arguments.createArray();
-                int length = result.size();
-                for(int i = 0; i < length ; i++){
-                    WritableMap writableMap = Arguments.createMap();
-                    LocalMedia item  = result.get(i);
-                    if(options.getBoolean("is_avatar")){
-                        writableMap.putString("path",item.getCutPath());
-                    }else{
-                        writableMap.putString("path",item.getAvailablePath());
-                    }
-                    writableMap.putDouble("size",item.getSize());
-                    writableMap.putInt("width",item.getWidth());
-                    writableMap.putInt("height",item.getHeight());
-                    if(options.getInt("picker_type") == 2){
-                        writableMap.putString("cover",item.getVideoThumbnailPath());
-                        writableMap.putDouble("duration", item.getDuration());
-                    }
-                    writableArray.pushMap(writableMap);
-                }
-                callback.invoke(writableArray);
-            }
-
-            @Override
-            public void onCancel() {
-                callback.invoke("cancel");
-            }
-        });
-    }
-
-    private String getVideoThumbnailDir() {
-        File externalFilesDir = this.getReactApplicationContext().getExternalFilesDir("");
-        File customFile = new File(externalFilesDir.getAbsolutePath(), "Thumbnail");
-        if (!customFile.exists()) {
-            customFile.mkdirs();
-        }
-        return customFile.getAbsolutePath() + File.separator;
-    }
-
-    @NonNull
-    @Override
-    public CameraXConfig getCameraXConfig() {
-        return CameraXConfig.Builder.fromConfig(Camera2Config.defaultConfig())
-                .setMinimumLoggingLevel(Log.ERROR).build();
-    }
-
-    private static class MeOnVideoThumbnailEventListener implements OnVideoThumbnailEventListener {
-        private final String targetPath;
-
-        public MeOnVideoThumbnailEventListener(String targetPath) {
-            this.targetPath = targetPath;
-        }
-
-        @Override
-        public void onVideoThumbnail(Context context, String videoPath, OnKeyValueResultCallbackListener call) {
-            Glide.with(context).asBitmap().sizeMultiplier(0.6F).load(videoPath).into(new CustomTarget<Bitmap>() {
-                @Override
-                public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                    resource.compress(Bitmap.CompressFormat.JPEG, 60, stream);
-                    FileOutputStream fos = null;
-                    String result = null;
-                    try {
-                        File targetFile = new File(targetPath, "thumbnails_" + System.currentTimeMillis() + ".jpg");
-                        fos = new FileOutputStream(targetFile);
-                        fos.write(stream.toByteArray());
-                        fos.flush();
-                        result = targetFile.getAbsolutePath();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    } finally {
-                        PictureFileUtils.close(fos);
-                        PictureFileUtils.close(stream);
-                    }
-                    if (call != null) {
-                        call.onCallback(videoPath, result);
-                    }
-                }
-
-                @Override
-                public void onLoadCleared(@Nullable Drawable placeholder) {
-                    if (call != null) {
-                        call.onCallback(videoPath, "");
-                    }
-                }
-            });
-        }
-    }
-
-
     /* 悬浮窗相关 */
 
     @ReactMethod
@@ -784,18 +592,6 @@ public class RCTZegoExpressNativeModule extends ReactContextBaseJavaModule  impl
                 promise.reject("ERROR", e.getMessage());
             }
         });
-    }
-
-
-
-    @ReactMethod
-    public void playNewMessageSound(){
-        try {
-            MediaPlayer mp = MediaPlayer.create(reactContext,R.raw.new_msg);
-            mp.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private Handler mHandlerBlockScreenShot = null;
